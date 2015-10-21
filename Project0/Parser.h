@@ -44,6 +44,8 @@ class Parser {
         isDirective = false;
         isBlankLine = false;
     }
+    
+    
 };
 
 #endif
