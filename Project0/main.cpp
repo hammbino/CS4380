@@ -35,7 +35,7 @@ vector<string> operators {
     ".INT", ".ALN", ".BYT",                     // Directives
 };
 
-bool IsOp(string s) {
+bool IsOp(string &s) {
 //    //Op values to compare against
 //    std::vector<string> operators {
 //        "TRP",                                      // Trap Instruction
@@ -73,7 +73,7 @@ bool IsReg(string s)
     return false;
 }
 
-bool IsImmediate(string s, string opcode)
+bool IsImmediate(string &s, string &opcode)
 {
     if (opcode == ".INT" || opcode == ".BYT")
     {
@@ -83,7 +83,7 @@ bool IsImmediate(string s, string opcode)
     {
         for (int i = 0; i < operators.size(); ++i) {
             string op = operators[i];
-            if ( s == op ) {
+            if ( opcode == op ) {
                 return false;
             }
         }
@@ -91,15 +91,22 @@ bool IsImmediate(string s, string opcode)
     return true;
 }
 
-void AddSymbol(string s, int a)
+void AddSymbol(string &s, string &s2, int &a)
 {
-    auto search = SymbolTable.find(s);
-    if(search != SymbolTable.end()) {
-        SymbolTable.emplace(s, a);
+    auto ret = SymbolTable.insert(std::make_pair(s, a));
+    if ( ! ret.second ) {
+//        cout << "key " <<  s << " already exists "
+//        << " with value " << (ret.first)->second << endl;
     }
-//    else {
-//        std::cerr << "ERROR: Symbol not found\n";
-//    }
+    else {
+//        cout << "created key " << s << " with value " << a << endl;
+        if (s2 == ".INT") {
+            a += 4;
+        }
+        else if (s2 == ".BYT") {
+            a++;
+        }
+    }
 }
 
 using byte = unsigned char;
@@ -108,7 +115,6 @@ int main(int argc, const char * argv[]) {
     const int MEM_SIZE = 1000000;
     int memCounter = 0;
     std::regex comment(";*");
-    std::vector<string> words;
     byte mem[MEM_SIZE];
     ifstream inputFile;
     
@@ -135,6 +141,8 @@ int main(int argc, const char * argv[]) {
              while (inputFile && std::getline(inputFile, lineFromFile)){
                  std::stringstream lineToSplit(lineFromFile);
                  string word;
+                 std::vector<string> words;
+                 words.clear();
                  while (lineToSplit >> word) {
 //
 //                     if(regex_match(word,comment)) {
@@ -142,32 +150,24 @@ int main(int argc, const char * argv[]) {
 //                         lineToSplit.ignore ( std::numeric_limits<std::streamsize>::max(), '\n' );
 //                     }
                      words.push_back(word);
+                     
+                     //check first strings for Labels
+                     if (!IsOp(words[0]) && !IsReg(words[0]) && !IsImmediate(words[0], words[1])) {
+                         AddSymbol(words[0], words[1], memCounter);
+                    }
                  }
-                 
-            }
-//            for (int i = 0; i < words.size(); ++i) {
-//                cout << words[i] << endl;
-            }
-        inputFile.close();
-        
-        //check first strings for Labels
-        if (!IsOp(words[0]) && !IsReg(words[0]) && !IsImmediate(words[0], words[1]))
-        {
-            AddSymbol(words[0], memCounter);
-            if (words[1] == ".INT")
-            {
-                memCounter += 4;
-            }
-            else if (words[1] == ".BYT")
-            {
-                memCounter++;
-            }
-            else
-            {
-                std::cerr << "ERROR: Invalid value given \n";
-                return -1;
-            }
+             }
         }
+        inputFile.close();
+//
+//        for (int i = 0; i < words.size(); ++i) {
+//            cout << i << "\t" << words[i] << endl;
+//        }
+        
+
+        // display symbol table contents
+        for (auto i = SymbolTable.begin(); i!=SymbolTable.end(); ++i)
+            std::cout << i->first << " => " << i->second << '\n';
     }
 }
 
