@@ -23,7 +23,12 @@ using std::map;
 #include <regex>
 #include <limits>
 
-map<string, int> SymbolTable;
+using byte = unsigned char;
+
+const int MEM_SIZE = 1000000;
+byte mem[MEM_SIZE] {};
+
+map<string, int> SymbolTable {};
 
 vector<string> operators {
     "TRP",                                      // Trap Instruction
@@ -35,58 +40,46 @@ vector<string> operators {
     ".INT", ".ALN", ".BYT",                     // Directives
 };
 
+//check if a string is an OpCode Operator
 bool IsOp(string &s) {
-//    //Op values to compare against
-//    std::vector<string> operators {
-//        "TRP",                                      // Trap Instruction
-//        "JMP", "JMR", "BNZ", "BGT", "BLT", "BRZ",   // Jump Instructions
-//        "MOV", "LDA", "STR", "LDR", "STB", "LDB",   // Move Instructions
-//        "ADD", "ADI", "SUB", "MUL", "DIV",          // Arithmetic Instructions
-//        "AND", "OR",                                // Logical Instructions
-//        "CMP",                                      // Compare Instructions
-//        ".INT", ".ALN", ".BYT",                     // Directives
-//    };
-    //check if an OpCode Operator
-    for (int i = 0; i < operators.size(); ++i) {
-        string op = operators[i];
-        if ( s == op ) {
+    for (auto i = operators.begin(); i != operators.end(); ++i) {
+        if (!s.compare(*i))
             return true;
-        }
     }
     return false;
 }
 
-bool IsReg(string s)
-{
-    char reg = 'R';
-    if (s[0] == reg)
-    {
-        if (s.size() == 2)
-        {
+//check is a string is a register
+bool IsReg(string s) {
+    if ((s[0] == 'R' || s[0] == 'r') && s.size() == 2) {
             return true;
-        }
-        else
-        {
-            return false;
-        }
     }
     return false;
 }
 
+//check is opCode is Immediate
 bool IsImmediate(string &s, string &opcode)
 {
+    for (auto i = 0; i < opcode.length(); ++i)
+        opcode[i] = toupper(opcode[i]);
     if (opcode == ".INT" || opcode == ".BYT")
     {
         return false;
     }
     else
     {
-        for (int i = 0; i < operators.size(); ++i) {
-            string op = operators[i];
-            if ( opcode == op ) {
+        for (auto i = operators.begin(); i != operators.end(); ++i) {
+            if (!s.compare(*i)) {
                 return false;
             }
         }
+//            
+//        for (int i = 0; i < operators.size(); ++i) {
+//            string op = operators[i];
+//            if ( opcode == op ) {
+//                return false;
+//            }
+//        }
     }
     return true;
 }
@@ -109,14 +102,32 @@ void AddSymbol(string &s, string &s2, int &a)
     }
 }
 
-using byte = unsigned char;
+void IntToMem(int number,int &position) {
+    mem[position++] = (char)(number >> 0);
+    mem[position++] = (char)(number >> 8);
+    mem[position++] = (char)(number >> 16);
+    mem[position++] = (char)(number >> 24);
+}
+
+void CharToMem(char character, int &position)
+{
+    mem[position++] = character;
+}
+
+
 
 int main(int argc, const char * argv[]) {
-    const int MEM_SIZE = 1000000;
+
     int memCounter = 0;
+    int pc = 0;
+    int position = 0;
     std::regex comment(";*");
-    byte mem[MEM_SIZE];
     ifstream inputFile;
+    string lineFromFile;
+    string word;
+    string tempString;
+    char tempChar = '\n';
+    
     
     // a .asm file must be sent from the command line
     if ( argc < 2 ) {
@@ -137,25 +148,35 @@ int main(int argc, const char * argv[]) {
             // ----------------
             // First Read
             // ----------------
-             string lineFromFile;
+            std::vector<string> words;
              while (inputFile && std::getline(inputFile, lineFromFile)){
                  std::stringstream lineToSplit(lineFromFile);
-                 string word;
-                 std::vector<string> words;
                  words.clear();
-                 while (lineToSplit >> word) {
-//
-//                     if(regex_match(word,comment)) {
-//                         cout << word << endl;
-//                         lineToSplit.ignore ( std::numeric_limits<std::streamsize>::max(), '\n' );
-//                     }
-                     words.push_back(word);
+                 if (lineToSplit.peek() != ';' && lineToSplit.peek() != '\n') {
+                     while (lineToSplit >> word) {
+    //                     if(regex_match(word,comment)) {
+    //                         cout << word << endl;
+    //                         lineToSplit.ignore ( std::numeric_limits<std::streamsize>::max(), '\n' );
+    //                     }
                      
-                     //check first strings for Labels
-                     if (!IsOp(words[0]) && !IsReg(words[0]) && !IsImmediate(words[0], words[1])) {
-                         AddSymbol(words[0], words[1], memCounter);
-                    }
+                         
+                         words.push_back(word);
+                         
+                         //check first strings for Labels
+                         
+                        }
+//                     for (auto wordToken : words) {
+//                         cout << wordToken << " ";
+//                     }
+//                     cout << endl;
+                     if (words.size()) {
+                         if (!IsOp(words[0]) && !IsReg(words[0]) && !IsImmediate(words[0], words[1])) {
+                             AddSymbol(words[0], words[1], memCounter);
+                         }
+                     }
                  }
+                 //DEBUG//
+//                 cout << lineFromFile << endl;
              }
         }
         inputFile.close();
@@ -169,5 +190,128 @@ int main(int argc, const char * argv[]) {
         for (auto i = SymbolTable.begin(); i!=SymbolTable.end(); ++i)
             std::cout << i->first << " => " << i->second << '\n';
     }
+    //-------------
+    // Second Pass
+    //-------------
+//    pc = memCounter;//start PC at end of static data (start of instructions)
+//    while (inputFile && std::getline(inputFile, lineFromFile)){
+//        std::stringstream lineToSplit(lineFromFile);
+//        std::vector<string> words;
+//        words.clear();
+//        while (lineToSplit >> word) {
+//            words.push_back(word);
+//        }
+//        auto search = SymbolTable.find(words[0]);
+//        if (search != SymbolTable.end()) {
+//            if(words[1] == ".INT") {
+//                int i_dec = std::stoi(words[2]);
+//                IntToMem(i_dec, position);
+//            }
+//            else if (words[1] == ".BYT") {
+//                if (words[2] == "'" && words[3] == "'") {
+//                    tempString = " ";
+//                }
+//                else {
+//                    tempString = '\n';
+//                }
+//                CharToMem(tempChar, position);
+//            }
+//        }
+//        
+//        if (IsOp(words[0]) == false) //if the first string is the not the OpCode
+//        {
+//            words.erase(words.begin());
+//        }
+//        if (IsOp(words[0]) == true)
+//        {
+//            int i_dec = std::stoi(words[0]);
+//            int i, j, k;
+//            switch (i_dec)
+//            {
+//                case 13: //Add OpCode is 13
+//                IntToMem(13, position);
+//                //store RD into mem
+//                i = std::stoi(words[1]);
+//                IntToMem(i , position);
+//                //store RS into mem
+//                j = std::stoi(words[2]);
+//                IntToMem(j, position);
+//                break;
+//                case 10: //LDR OpCode is 10
+//                IntToMem(10, position);
+//                //store RD into mem
+//                int k = std::stod(words[1]);
+//                IntToMem(k, position);
+//                //store value from label
+//                tempString = words[2];
+//                int tempSymbolValue = SymbolTable[tempString];
+//                IntToMem(tempSymbolValue, position);
+//                break;
+//                case 12: //LDB OpCode is 12
+//                IntToMem(12, position);
+//                //Store RD into mem
+//                j = std::stoi(words[1]);
+//                IntToMem(i, position);
+//                //store label value into mem
+//                tempString = words[2];
+//                tempSymbolValue = SymbolTable[tempString];
+//                IntToMem(tempSymbolValue, position);
+//                break;
+//                case 0: //TRP OpCode is 0
+//                IntToMem(0, position);
+//                //check what kind of TRP
+//                if (words[1] == "3")
+//                {
+//                    IntToMem(3, position);
+//                }
+//                else if (words[1] == "0")
+//                {
+//                    IntToMem(0, position);
+//                }
+//                else if (words[1] == "1")
+//                {
+//                    IntToMem(1, position);
+//                }
+//                break;
+//                case 7: //MOV OpCode is 7
+//                IntToMem(7, position);
+//                //store RD into mem
+//                i = std::stoi(words[1]);
+//                IntToMem(i, position);
+//                //store RS into mem
+//                i = std::stoi(words[2]);
+//                IntToMem(i, position);
+//                break;
+//                case 17: //DIV OpCode is 17
+//                IntToMem(17, position);
+//                //store RD into mem
+//                i = std::stoi(words[1]);
+//                IntToMem(i, position);
+//                //store RS into mem
+//                i = std::stoi(words[2]);
+//                IntToMem(i, position);
+//                break;
+//                case 16: //MUL OpCode is 16
+//                IntToMem(16, position);
+//                //store RD into mem
+//                i = std::stoi(words[1]);
+//                IntToMem(i, position);
+//                //store RS into mem
+//                i = std::stoi(words[2]);
+//                IntToMem(i, position);
+//                break;
+//                case 15: //SUB OpCode is 15
+//                IntToMem(15, position);
+//                //store RD into mem
+//                i = std::stoi(words[1]);
+//                IntToMem(i, position);
+//                //store RS into mem
+//                i = std::stoi(words[1]);
+//                IntToMem(i, position);
+//                break;
+//                default:
+//                break;
+//            }
+//        }
+//    }
 }
-
